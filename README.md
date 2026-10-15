@@ -65,6 +65,7 @@ BOT-SETUP-DISCORD-SERVER/
 
 
 🚀 Cara Menjalankan Proyek
+```
 
 1. Prasyarat (Prerequisites)
 
@@ -118,6 +119,7 @@ npm install
 Jalankan aplikasi React:
 
 npm run dev
+```
 
 
 Buka URL lokal yang muncul di terminal (biasanya http://localhost:5173).
