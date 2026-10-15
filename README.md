@@ -24,14 +24,19 @@ Pengaturan saluran log (Log Channel Card).
 
 📁 Struktur Proyek
 
+## 📁 Struktur Proyek
+
+```asciidoc
 BOT-SETUP-DISCORD-SERVER/
-├── backend/                  # REST API & Discord Bot Logic
-│   ├── .env.example          # Template konfigurasi environment backend
-│   ├── package.json          # Dependensi backend
-│   └── server.js             # Server Express & integrasi discord.js
-├── frontend/                 # Application Frontend (React + Vite + Tailwind)
+├── backend/
+│   ├── .env.example              # Template variabel environment
+│   ├── package.json              # Dependensi server backend
+│   └── server.js                 # Express server & Bot logic
+│
+├── frontend/
+│   ├── public/                   # Aset publik statis
 │   ├── src/
-│   │   ├── components/       # Komponen UI (Modal, Builder, Cards, Selector)
+│   │   ├── components/           # Komponen UI Reusable
 │   │   │   ├── BulkDeleteModal.jsx
 │   │   │   ├── EditCategoryModal.jsx
 │   │   │   ├── EditChannelModal.jsx
@@ -41,18 +46,22 @@ BOT-SETUP-DISCORD-SERVER/
 │   │   │   ├── PermissionsSelector.jsx
 │   │   │   ├── Presets.jsx
 │   │   │   └── ServerBuilder.jsx
-│   │   ├── data/             # Template awal & data permission
+│   │   ├── data/                 # Template & konfigurasi permissions
 │   │   │   ├── permissionsData.js
 │   │   │   └── templates.js
-│   │   ├── store/            # State Management (Zustand)
+│   │   ├── store/                # State Management (Zustand)
 │   │   │   └── useSetupStore.js
-│   │   ├── App.jsx           # Komponen Utama
-│   │   ├── main.jsx          # Entry point React
-│   │   └── index.css         # Styling global
-│   ├── index.html
-│   ├── package.json          # Dependensi frontend
-│   └── vite.config.js        # Konfigurasi Vite
+│   │   ├── App.jsx               # Komponen utama aplikasi
+│   │   ├── index.css             # Konfigurasi Tailwind & Global CSS
+│   │   └── main.jsx              # Entry point React
+│   ├── index.html                # Template HTML dasar
+│   ├── package.json              # Dependensi frontend
+│   ├── postcss.config.js         # Konfigurasi PostCSS
+│   ├── tailwind.config.js        # Konfigurasi Tailwind CSS
+│   └── vite.config.js            # Konfigurasi Vite bundler
+│
 └── README.md
+```
 
 
 🚀 Cara Menjalankan Proyek
