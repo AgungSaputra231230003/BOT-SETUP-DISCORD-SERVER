@@ -1,0 +1,64 @@
+# =========================================================================
+# .gitignore - Disusun khusus untuk Arsitektur Monorepo (Backend + Frontend)
+# Berdasarkan struktur: Node.js (backend) + Vite (frontend) + Root configs
+# Aturan Khusus: Semua *.md diabaikan KECUALI README.md
+# =========================================================================
+
+# 1. Dependensi (Node.js & Frontend)
+node_modules/
+/.pnp
+.pnp.js
+
+# 2. Kunci Rahasia & Environment (.env)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+
+# 3. Hasil Build & Kompilasi (Frontend Vite / Backend)
+dist/
+dist-ssr/
+build/
+*.local
+
+# 4. Cache & Temporary Files
+.vite/
+.eslintcache
+.cache/
+tmp/
+temp/
+
+# 5. Testing & Code Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# 6. Logs & Catatan Debugging
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 7. File Sistem Operasi (OS Junk)
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# 8. Pengaturan IDE & Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.sw?
+
+# 10. Dokumen Markdown (.md)
+*.md
+!README.md
+!readme.md
