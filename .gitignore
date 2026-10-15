@@ -17,6 +17,7 @@ node_modules/
 .env.production.local
 *.env
 !.env.example
+.zip
 
 # 3. Hasil Build & Kompilasi (Frontend Vite / Backend)
 dist/

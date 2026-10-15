@@ -1,57 +1,120 @@
-# Discord Bot Hub & Auto Setup Server Builder
+🛠️ Discord Server Setup Web App & Bot
 
-Aplikasi ini adalah implementasi awal dari PRD yang dibuat untuk membangun aplikasi web yang dapat:
+Aplikasi web interaktif dan backend Discord Bot berbasis Node.js & React (Vite) untuk merancang, mengonfigurasi, dan menerapkan (deploy) struktur server Discord secara otomatis, cepat, dan terorganisir.
 
-- menampilkan katalog bot Discord populer,
-- memilih bot favorit,
-- membuat struktur server (roles, categories, channels),
-- menyiapkan welcome message,
-- mengirim payload JSON ke backend Node.js,
-- menjalankan setup server melalui Bot Manager Discord.
+🌟 Fitur Utama
 
-## Struktur Project
+🎨 Visual Server Builder: UI visual interaktif untuk menyusun Kategori, Saluran Teks/Suara (Text/Voice Channels), dan Peran (Roles).
 
-- `backend/` berisi server Express + Discord.js manager.
-- `frontend/` berisi UI React + Vite yang berfungsi sebagai antarmuka konfigurasi.
+📋 Preset & Template: Pilihan template server siap pakai yang dapat langsung dimuat dan dikustomisasi sesuai kebutuhan.
 
-## Setup
+🔑 Sistem Izin (Permissions) Detil: Pengaturan hak akses peran dan saluran yang presisi (menggunakan Permissions Selector dan Permission Modal).
 
-### 1. Install dependencies
+🏷️ Manajemen Kategori & Saluran:
 
-```bash
-cd backend && npm install
-cd ../frontend && npm install
-```
+Tambah, edit, dan hapus kategori serta saluran.
 
-### 2. Konfigurasi bot token
+Opsi penghapusan massal (Bulk Delete Modal).
 
-Salin file `.env.example` menjadi `.env` di folder backend, lalu isi token Discord bot Anda.
+Pengaturan saluran log (Log Channel Card).
 
-```bash
-cp backend/.env.example backend/.env
-```
+🎭 Manajemen Peran (Roles): Membuat, mengedit warna, nama, dan hak akses role.
 
-### 3. Jalankan backend
+⚡ Auto-Deploy via Discord Bot: Menghubungkan frontend web ke backend API untuk langsung menerapkan struktur ke server Discord Anda melalui Bot Discord.
 
-```bash
+📁 Struktur Proyek
+
+BOT-SETUP-DISCORD-SERVER/
+├── backend/                  # REST API & Discord Bot Logic
+│   ├── .env.example          # Template konfigurasi environment backend
+│   ├── package.json          # Dependensi backend
+│   └── server.js             # Server Express & integrasi discord.js
+├── frontend/                 # Application Frontend (React + Vite + Tailwind)
+│   ├── src/
+│   │   ├── components/       # Komponen UI (Modal, Builder, Cards, Selector)
+│   │   │   ├── BulkDeleteModal.jsx
+│   │   │   ├── EditCategoryModal.jsx
+│   │   │   ├── EditChannelModal.jsx
+│   │   │   ├── EditRoleModal.jsx
+│   │   │   ├── LogChannelCard.jsx
+│   │   │   ├── PermissionModal.jsx
+│   │   │   ├── PermissionsSelector.jsx
+│   │   │   ├── Presets.jsx
+│   │   │   └── ServerBuilder.jsx
+│   │   ├── data/             # Template awal & data permission
+│   │   │   ├── permissionsData.js
+│   │   │   └── templates.js
+│   │   ├── store/            # State Management (Zustand)
+│   │   │   └── useSetupStore.js
+│   │   ├── App.jsx           # Komponen Utama
+│   │   ├── main.jsx          # Entry point React
+│   │   └── index.css         # Styling global
+│   ├── index.html
+│   ├── package.json          # Dependensi frontend
+│   └── vite.config.js        # Konfigurasi Vite
+└── README.md
+
+
+🚀 Cara Menjalankan Proyek
+
+1. Prasyarat (Prerequisites)
+
+Node.js (versi 16 atau lebih baru)
+
+Bot Discord Token & Application Client ID dari Discord Developer Portal
+
+2. Konfigurasi Backend
+
+Buka direktori backend:
+
 cd backend
+
+
+Install dependensi:
+
+npm install
+
+
+Salin file .env.example menjadi .env:
+
+cp .env.example .env
+
+
+Isi kredensial bot Discord Anda di file .env:
+
+PORT=5000
+DISCORD_BOT_TOKEN=YOUR_DISCORD_BOT_TOKEN
+CLIENT_ID=YOUR_CLIENT_ID
+
+
+Jalankan server backend:
+
+npm start
+# atau untuk mode pengembang:
 npm run dev
-```
 
-### 4. Jalankan frontend
 
-```bash
-cd frontend
+3. Konfigurasi Frontend
+
+Buka direktori frontend:
+
+cd ../frontend
+
+
+Install dependensi:
+
+npm install
+
+
+Jalankan aplikasi React:
+
 npm run dev
-```
 
-### 5. Akses aplikasi
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:5000
+Buka URL lokal yang muncul di terminal (biasanya http://localhost:5173).
 
-## Catatan
+🛠️ Teknologi yang Digunakan
 
-- Frontend mengirim request ke `http://localhost:5000/api/setup`.
-- Bot manager perlu sudah masuk ke Guild/Server target untuk bisa membuat roles, category, dan channel.
-- Tanpa `DISCORD_BOT_TOKEN` valid, backend tetap berjalan dalam mode non-aktif dan tidak akan terhubung ke Discord.
+Frontend: React, Vite, Tailwind CSS, Zustand (State Management), Lucide Icons / Heroicons.
+
+Backend: Node.js, Express.js, Discord.js (v14).
