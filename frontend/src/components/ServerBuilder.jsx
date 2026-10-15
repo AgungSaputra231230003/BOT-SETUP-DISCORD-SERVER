@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Send, Trash2, Edit2, Shield, Hash, Volume2, Sparkles, Layers } from 'lucide-react';
+import { Plus, Send, Trash2, Edit2, Shield, Hash, Volume2, Sparkles, Layers, RefreshCw } from 'lucide-react';
 import { Presets } from './Presets';
 import { LogChannelCard } from './LogChannelCard';
 import { EditRoleModal } from './EditRoleModal';
@@ -110,16 +110,38 @@ export function ServerBuilder({ onExecute, loading }) {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {guildInfo.name && (
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setShowBulkDeleteModal(true)}
-              title="Buka menu bulk delete masal"
-              style={{ display: 'inline-flex', alignItems: 'center', borderColor: 'rgba(248, 113, 113, 0.3)' }}
-            >
-              <Trash2 size={15} style={{ marginRight: 6, color: '#f87171' }} />
-              Bulk Delete Tools
-            </button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  if (guildId && guildId.trim()) {
+                    syncGuildData(guildId);
+                  }
+                }}
+                disabled={isSyncingGuild}
+                title="Refresh Data Server"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '10px 12px'
+                }}
+              >
+                <RefreshCw size={15} className={isSyncingGuild ? 'spin-animation' : ''} />
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                title="Buka menu bulk delete masal"
+                style={{ display: 'inline-flex', alignItems: 'center', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+              >
+                <Trash2 size={15} style={{ marginRight: 6, color: '#f87171' }} />
+                Bulk Delete Tools
+              </button>
+              
+            </div>
           )}
           <button
             type="button"
@@ -614,6 +636,7 @@ export function ServerBuilder({ onExecute, loading }) {
         <EditChannelModal
           channel={editingChannel}
           categories={guildCategories}
+          guildRoles={guildRoles}
           onClose={() => setEditingChannel(null)}
           onSave={updateGuildChannel}
         />

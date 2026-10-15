@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, Check, AlertTriangle, Shield } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Check, Shield } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
 
 export function PermissionModal({
@@ -10,14 +11,29 @@ export function PermissionModal({
   onClose,
   onSave
 }) {
-  const [permissions, setPermissions] = useState([...initialPermissions]);
+  const normalizePermissions = (perms) => {
+    if (Array.isArray(perms)) {
+      if (perms.length > 0 && typeof perms[0] === 'string') {
+        return perms;
+      }
+      return perms.map(p => p.key || p.name).filter(Boolean);
+    }
+    if (perms && typeof perms === 'object') {
+      return Object.entries(perms)
+        .filter(([_, val]) => val === true || (typeof val === 'object' && val.value === true))
+        .map(([key]) => key);
+    }
+    return [];
+  };
+
+  const [permissions, setPermissions] = useState(() => normalizePermissions(initialPermissions));
 
   const handleSave = () => {
     onSave(permissions);
     onClose();
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container modal-large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -56,6 +72,7 @@ export function PermissionModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

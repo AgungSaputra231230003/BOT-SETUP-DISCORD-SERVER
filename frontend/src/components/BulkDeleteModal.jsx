@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Trash2, Hash, Volume2, Shield, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export function BulkDeleteModal({
@@ -189,7 +190,7 @@ export function BulkDeleteModal({
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container modal-large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -474,6 +475,7 @@ export function BulkDeleteModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

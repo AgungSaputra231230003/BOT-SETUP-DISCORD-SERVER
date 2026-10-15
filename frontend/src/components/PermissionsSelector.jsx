@@ -59,11 +59,12 @@ export function PermissionsSelector({
 
   const allVisiblePermIds = filteredGroups.flatMap((g) => g.permissions.map((p) => p.id));
 
+  // Menambahkan kategori 'Aplikasi & Aktivitas (Apps)' agar tab filternya sinkron dengan permissionsData
   const availableTabs = [
     'Semua',
     ...(mode === 'channel'
-      ? ['Akses & Visibilitas', 'Pesan & Obrolan (Text)', 'Suara & Video (Voice)']
-      : ['Administrasi & Server', 'Keanggotaan & Moderasi', 'Pesan & Obrolan (Text)', 'Suara & Video (Voice)'])
+      ? ['Akses & Visibilitas', 'Pesan & Obrolan (Text)', 'Suara & Video (Voice)', 'Aplikasi & Aktivitas (Apps)']
+      : ['Administrasi & Server', 'Keanggotaan & Moderasi', 'Pesan & Obrolan (Text)', 'Suara & Video (Voice)', 'Aplikasi & Aktivitas (Apps)'])
   ];
 
   return (
@@ -193,6 +194,8 @@ export function PermissionsSelector({
                 ? 'Teks'
                 : tab === 'Suara & Video (Voice)'
                 ? 'Suara'
+                : tab === 'Aplikasi & Aktivitas (Apps)'
+                ? 'Apps'
                 : 'Semua'}
             </button>
           ))}

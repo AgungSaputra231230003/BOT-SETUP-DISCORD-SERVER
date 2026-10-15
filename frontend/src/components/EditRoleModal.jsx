@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, AlertTriangle } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
 
@@ -41,7 +42,7 @@ export function EditRoleModal({ role, onClose, onSave }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container modal-large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -141,6 +142,7 @@ export function EditRoleModal({ role, onClose, onSave }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

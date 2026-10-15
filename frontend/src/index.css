@@ -817,16 +817,19 @@ button {
 /* ========================================================
    Modal Dialogs
    ======================================================== */
+/* ========================================================
+   Modal Dialogs (Dibuat Melayang di Atas Browser / Alert Style)
+   ======================================================== */
 .modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(5, 8, 18, 0.78);
   backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Mengubah posisi popup ke bagian atas browser */
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 24px 16px;       /* Memberikan jarak dari atas layar */
   animation: fadeIn 0.18s ease-out;
 }
 
@@ -842,11 +845,22 @@ button {
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.65);
   width: 100%;
   max-width: 520px;
-  max-height: 90vh;
+  max-height: calc(100vh - 48px); /* Batasi tinggi agar tidak melebihi layar */
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: modalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-container.modal-small {

@@ -106,7 +106,7 @@ const toChannelType = (channel) => {
 // Helper to send Discord log embed to target channel (optional feature)
 const sendDiscordLog = async (guild, targetLogChannelId, { title, description, color = 0x8b5cf6, fields = [] }) => {
   const channelId = targetLogChannelId || guildSettings.get(guild.id)?.logChannelId;
-  if (!channelId) return; // Opsional: jika tidak diatur, tidak ada log
+  if (!channelId) return;
 
   try {
     const channel =
@@ -139,6 +139,17 @@ const buildGuildSnapshot = async (guild) => {
     return everyoneOverwrite ? everyoneOverwrite.allow.toArray() : [];
   };
 
+  const getChannelOverwrites = (channelOrCategory) => {
+    if (!channelOrCategory.permissionOverwrites) return [];
+    return [...channelOrCategory.permissionOverwrites.cache.values()].map((ow) => ({
+      id: ow.id,
+      type: ow.type === OverwriteType.Member ? 'member' : 'role',
+      allow: ow.allow.toArray(),
+      deny: ow.deny.toArray(),
+      permissions: ow.allow.toArray()
+    }));
+  };
+
   const roles = [...guild.roles.cache.values()]
     .sort((a, b) => b.position - a.position)
     .map((role) => ({
@@ -159,6 +170,7 @@ const buildGuildSnapshot = async (guild) => {
       id: category.id,
       name: category.name,
       permissions: getEveryonePermissions(category),
+      permissionOverwrites: getChannelOverwrites(category),
       channels: [...guild.channels.cache.values()]
         .filter((channel) => channel.parentId === category.id && channel.type !== ChannelType.GuildCategory)
         .sort((a, b) => a.position - b.position)
@@ -168,7 +180,8 @@ const buildGuildSnapshot = async (guild) => {
           type: toChannelType(channel),
           topic: channel.topic || '',
           parentId: category.id,
-          permissions: getEveryonePermissions(channel)
+          permissions: getEveryonePermissions(channel),
+          permissionOverwrites: getChannelOverwrites(channel)
         }))
     }));
 
@@ -181,7 +194,8 @@ const buildGuildSnapshot = async (guild) => {
       type: toChannelType(channel),
       topic: channel.topic || '',
       parentId: null,
-      permissions: getEveryonePermissions(channel)
+      permissions: getEveryonePermissions(channel),
+      permissionOverwrites: getChannelOverwrites(channel)
     }));
 
   if (uncategorizedChannels.length > 0) {
@@ -192,7 +206,6 @@ const buildGuildSnapshot = async (guild) => {
     });
   }
 
-  // All text channels for dropdowns (Log Channel, Purge Target, etc.)
   const textChannels = [...guild.channels.cache.values()]
     .filter((channel) => channel.isTextBased && channel.isTextBased() && channel.type !== ChannelType.GuildCategory)
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -310,7 +323,7 @@ app.post('/api/guild/:guildId/settings', async (req, res) => {
     if (newLogChannelId) {
       await sendDiscordLog(guild, newLogChannelId, {
         title: '🔔 Channel Log Diaktifkan',
-        description: `Channel ini telah dipilih untuk menerima seluruh log aktivitas Discord Auto Setup Builder (penghapusan, pengeditan role/channel, setup, dan bulk delete).`,
+        description: `Channel ini telah dipilih untuk menerima seluruh log aktivitas Discord Auto Setup Builder.`,
         color: 0x22c55e,
         fields: [
           { name: 'Server', value: guild.name, inline: true },
@@ -323,7 +336,7 @@ app.post('/api/guild/:guildId/settings', async (req, res) => {
       success: true,
       message: newLogChannelId
         ? 'Channel log Discord berhasil disimpan dan diuji!'
-        : 'Channel log Discord dinonaktifkan (tidak akan ada notifikasi).',
+        : 'Channel log Discord dinonaktifkan.',
       settings: guildSettings.get(guildId)
     });
   } catch (error) {
@@ -362,7 +375,7 @@ app.post('/api/guild/:guildId/test-log', async (req, res) => {
     if (!channel || !channel.isTextBased()) {
       return res.status(404).json({
         success: false,
-        message: 'Channel log tidak ditemukan atau bukan text channel yang dapat dikirimi pesan.'
+        message: 'Channel log tidak ditemukan atau bukan text channel yang valid.'
       });
     }
 
@@ -405,24 +418,17 @@ app.delete('/api/guild/:guildId/roles/:roleId', async (req, res) => {
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const role = guild.roles.cache.get(roleId);
     if (!role) {
-      return res.status(404).json({
-        success: false,
-        message: 'Role tidak ditemukan di guild ini.'
-      });
+      return res.status(404).json({ success: false, message: 'Role tidak ditemukan di guild ini.' });
     }
 
     const roleName = role.name;
     const roleColor = normalizeHexColor(role.color);
 
-    // Check hierarchy
     const botMember = await guild.members.fetchMe().catch(() => null);
     if (botMember && role.position >= botMember.roles.highest.position) {
       return res.status(403).json({
@@ -433,7 +439,6 @@ app.delete('/api/guild/:guildId/roles/:roleId', async (req, res) => {
 
     await role.delete(`Deleted via Discord Auto Setup Builder`);
 
-    // Log to Discord (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🗑️ Role Dihapus',
       description: `Role **${roleName}** telah dihapus dari server.`,
@@ -465,34 +470,25 @@ app.patch('/api/guild/:guildId/roles/:roleId', async (req, res) => {
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !roleId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Role ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan Role ID wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const role = guild.roles.cache.get(roleId);
     if (!role) {
-      return res.status(404).json({
-        success: false,
-        message: 'Role tidak ditemukan di guild ini.'
-      });
+      return res.status(404).json({ success: false, message: 'Role tidak ditemukan di guild ini.' });
     }
 
     const botMember = await guild.members.fetchMe().catch(() => null);
     if (botMember && role.position >= botMember.roles.highest.position && role.id !== guild.id) {
       return res.status(403).json({
         success: false,
-        message: `Tidak dapat mengedit role "${role.name}" karena posisinya sama atau lebih tinggi dari role bot. Naikkan posisi role bot di Discord.`
+        message: `Tidak dapat mengedit role "${role.name}" karena posisinya sama atau lebih tinggi dari role bot.`
       });
     }
 
@@ -527,13 +523,12 @@ app.patch('/api/guild/:guildId/roles/:roleId', async (req, res) => {
 
       if (added.length > 0 || removed.length > 0) {
         const changesText = [];
-        if (added.length > 0) changesText.push(`+ Ditambahkan (${added.length}): ${added.slice(0, 10).join(', ')}${added.length > 10 ? '...' : ''}`);
-        if (removed.length > 0) changesText.push(`- Dihapus (${removed.length}): ${removed.slice(0, 10).join(', ')}${removed.length > 10 ? '...' : ''}`);
+        if (added.length > 0) changesText.push(`+ Ditambahkan (${added.length}): ${added.slice(0, 10).join(', ')}`);
+        if (removed.length > 0) changesText.push(`- Dihapus (${removed.length}): ${removed.slice(0, 10).join(', ')}`);
         logFields.push({ name: 'Perubahan Permissions', value: changesText.join('\n'), inline: false });
       }
     }
 
-    // Role @everyone tidak boleh diedit nama, warna, atau hoist-nya oleh Discord API
     if (role.id === guild.id) {
       delete updatePayload.name;
       delete updatePayload.color;
@@ -541,10 +536,7 @@ app.patch('/api/guild/:guildId/roles/:roleId', async (req, res) => {
     }
 
     if (Object.keys(updatePayload).length === 0) {
-      return res.json({
-        success: true,
-        message: 'Tidak ada perubahan pada role.'
-      });
+      return res.json({ success: true, message: 'Tidak ada perubahan pada role.' });
     }
 
     await role.edit({
@@ -552,7 +544,6 @@ app.patch('/api/guild/:guildId/roles/:roleId', async (req, res) => {
       reason: 'Role updated via Discord Auto Setup Builder'
     });
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🛡️ Role Diperbarui',
       description: `Role **${role.name}** berhasil diedit.`,
@@ -580,27 +571,18 @@ app.delete('/api/guild/:guildId/channels/:channelId', async (req, res) => {
   const logChannelId = req.headers['x-log-channel-id'] || req.query.logChannelId;
 
   if (!guildId || !channelId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Channel ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan Channel ID wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const channel = guild.channels.cache.get(channelId);
     if (!channel) {
-      return res.status(404).json({
-        success: false,
-        message: 'Channel tidak ditemukan di guild ini.'
-      });
+      return res.status(404).json({ success: false, message: 'Channel tidak ditemukan di guild ini.' });
     }
 
     const channelName = channel.name;
@@ -608,7 +590,6 @@ app.delete('/api/guild/:guildId/channels/:channelId', async (req, res) => {
 
     await channel.delete(`Deleted via Discord Auto Setup Builder`);
 
-    // Log to Discord (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🗑️ Channel Dihapus',
       description: `Channel **${channelType === 'Voice' ? '🔊' : '#'}${channelName}** telah dihapus.`,
@@ -633,34 +614,25 @@ app.delete('/api/guild/:guildId/channels/:channelId', async (req, res) => {
   }
 });
 
-// Edit channel (name, topic, parent category)
+// Edit channel (name, topic, parent category, & permission overwrites with Private Channel support)
 app.patch('/api/guild/:guildId/channels/:channelId', async (req, res) => {
   const { guildId, channelId } = req.params;
-  const { name, topic, parentId, permissions } = req.body;
+  const { name, topic, parentId, permissions, permissionOverwrites } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !channelId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Channel ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan Channel ID wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const channel = guild.channels.cache.get(channelId);
     if (!channel) {
-      return res.status(404).json({
-        success: false,
-        message: 'Channel tidak ditemukan di guild ini.'
-      });
+      return res.status(404).json({ success: false, message: 'Channel tidak ditemukan di guild ini.' });
     }
 
     const oldName = channel.name;
@@ -690,16 +662,43 @@ app.patch('/api/guild/:guildId/channels/:channelId', async (req, res) => {
       }
     }
 
-    if (Array.isArray(permissions)) {
+    // Tangani permissionOverwrites dengan dukungan Private Channel untuk @everyone secara akurat[cite: 12]
+    if (Array.isArray(permissionOverwrites)) {
+      updatePayload.permissionOverwrites = permissionOverwrites
+        .filter((ow) => ow && ow.id && (ow.id === guild.id || /^\d+$/.test(ow.id)))
+        .map((ow) => {
+          const allowed = (ow.permissions || []).filter((p) => CHANNEL_PERMISSION_FLAGS.has(p));
+          let denied = [...CHANNEL_PERMISSION_FLAGS].filter((p) => !allowed.includes(p));
+
+          if (ow.id === guild.id) {
+            const isVoiceChannel = channel.type === ChannelType.GuildVoice;
+            const targetFlag = isVoiceChannel ? 'Connect' : 'ViewChannel';
+
+            const hasExplicitAllow = allowed.includes(targetFlag);
+            const hasExplicitDeny = ow.deny && ow.deny.includes(targetFlag);
+
+            if (!hasExplicitAllow && (hasExplicitDeny || !allowed.includes(targetFlag))) {
+              if (!denied.includes(targetFlag)) denied.push(targetFlag);
+            } else {
+              denied = denied.filter(p => p !== targetFlag);
+            }
+          }
+
+          return {
+            id: ow.id,
+            type: ow.type === 'member' ? OverwriteType.Member : OverwriteType.Role,
+            allow: allowed,
+            deny: denied
+          };
+        });
+      logFields.push({ name: 'Hak Izin Channel', value: `${updatePayload.permissionOverwrites.length} target diatur`, inline: true });
+    } else if (Array.isArray(permissions)) {
       updatePayload.permissionOverwrites = buildChannelOverwrites(guild, permissions, channel);
       logFields.push({ name: 'Hak Izin Channel', value: `${permissions.length} izin diaktifkan`, inline: true });
     }
 
     if (Object.keys(updatePayload).length === 0) {
-      return res.json({
-        success: true,
-        message: 'Tidak ada perubahan pada channel.'
-      });
+      return res.json({ success: true, message: 'Tidak ada perubahan pada channel.' });
     }
 
     await channel.edit({
@@ -707,7 +706,6 @@ app.patch('/api/guild/:guildId/channels/:channelId', async (req, res) => {
       reason: 'Channel updated via Discord Auto Setup Builder'
     });
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '✏️ Channel Diperbarui',
       description: `Channel **#${channel.name}** telah diperbarui.`,
@@ -729,45 +727,27 @@ app.patch('/api/guild/:guildId/channels/:channelId', async (req, res) => {
   }
 });
 
-// Category delete WITH CASCADE DELETE OF INNER CHANNELS (Requirement 1)
+// Category delete WITH CASCADE DELETE OF INNER CHANNELS
 app.delete('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
   const { guildId, categoryId } = req.params;
   const logChannelId = req.headers['x-log-channel-id'] || req.query.logChannelId;
 
   if (!guildId || !categoryId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Category ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan Category ID wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const category = guild.channels.cache.get(categoryId);
-    if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: 'Category tidak ditemukan di guild ini.'
-      });
-    }
-
-    if (category.type !== ChannelType.GuildCategory) {
-      return res.status(400).json({
-        success: false,
-        message: 'Channel tersebut bukan category.'
-      });
+    if (!category || category.type !== ChannelType.GuildCategory) {
+      return res.status(404).json({ success: false, message: 'Category tidak ditemukan di guild ini.' });
     }
 
     const categoryName = category.name;
-
-    // 1. Ambil seluruh channel di dalam category ini untuk dihapus juga (Cascade Delete)
     const childChannels = [...guild.channels.cache.values()].filter(
       (channel) => channel.parentId === categoryId
     );
@@ -783,32 +763,21 @@ app.delete('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
       }
     }
 
-    // 2. Hapus category itu sendiri
     await category.delete(`Deleted via Discord Auto Setup Builder`);
 
-    // 3. Kirim Discord log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🗑️ Category & Channel Terkait Dihapus',
       description: `Category **${categoryName}** telah dihapus beserta **${deletedChannelNames.length} channel** di dalamnya.`,
       color: 0xef4444,
       fields: [
         { name: 'Category Dihapus', value: categoryName, inline: true },
-        { name: 'Jumlah Channel Ikut Dihapus', value: `${deletedChannelNames.length} channel`, inline: true },
-        ...(deletedChannelNames.length > 0
-          ? [
-              {
-                name: 'Daftar Channel yang Terhapus',
-                value: deletedChannelNames.map((n) => `• #${n}`).slice(0, 20).join('\n') +
-                  (deletedChannelNames.length > 20 ? `\n...dan ${deletedChannelNames.length - 20} lainnya` : '')
-              }
-            ]
-          : [])
+        { name: 'Jumlah Channel Ikut Dihapus', value: `${deletedChannelNames.length} channel`, inline: true }
       ]
     });
 
     return res.json({
       success: true,
-      message: `Category "${categoryName}" beserta ${deletedChannelNames.length} channel di dalamnya berhasil dihapus.`
+      message: `Category "${categoryName}" beserta ${deletedChannelNames.length} channel berhasil dihapus.`
     });
   } catch (error) {
     console.error('Error deleting guild category:', error);
@@ -827,10 +796,7 @@ app.post('/api/guild/:guildId/categories/:categoryId/channels', async (req, res)
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !categoryId || !name || !name.trim()) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID, Category ID, dan nama channel wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID, Category ID, dan nama channel wajib diisi.' });
   }
 
   try {
@@ -897,35 +863,19 @@ app.patch('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
   const { name, permissions } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
-  if (!guildId || !categoryId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Category ID wajib diisi.'
-    });
-  }
-
-  if (!name || !name.trim()) {
-    return res.status(400).json({
-      success: false,
-      message: 'Nama category baru wajib diisi.'
-    });
+  if (!guildId || !categoryId || !name || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Guild ID, Category ID, dan nama baru wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guild tidak ditemukan.'
-      });
+      return res.status(404).json({ success: false, message: 'Guild tidak ditemukan.' });
     }
 
     const category = guild.channels.cache.get(categoryId);
     if (!category || category.type !== ChannelType.GuildCategory) {
-      return res.status(404).json({
-        success: false,
-        message: 'Category tidak ditemukan di guild ini.'
-      });
+      return res.status(404).json({ success: false, message: 'Category tidak ditemukan di guild ini.' });
     }
 
     const oldName = category.name;
@@ -941,10 +891,7 @@ app.patch('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
     }
 
     if (Object.keys(editPayload).length === 0) {
-      return res.json({
-        success: true,
-        message: 'Tidak ada perubahan pada category.'
-      });
+      return res.json({ success: true, message: 'Tidak ada perubahan pada category.' });
     }
 
     await category.edit({
@@ -952,10 +899,9 @@ app.patch('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
       reason: 'Category updated via Discord Auto Setup Builder'
     });
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '✏️ Category Diperbarui',
-      description: `Nama category telah diubah.`,
+      description: `Nama category telah diubah dari **${oldName}** menjadi **${newName}**.`,
       color: 0x3b82f6,
       fields: [
         { name: 'Sebelum', value: oldName, inline: true },
@@ -977,17 +923,14 @@ app.patch('/api/guild/:guildId/categories/:categoryId', async (req, res) => {
   }
 });
 
-// Bulk delete channels (Requirement 6)
+// Bulk delete channels
 app.post('/api/guild/:guildId/bulk-delete/channels', async (req, res) => {
   const { guildId } = req.params;
   const { channelIds } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !Array.isArray(channelIds) || channelIds.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan daftar channelIds wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan daftar channelIds wajib diisi.' });
   }
 
   try {
@@ -1012,22 +955,12 @@ app.post('/api/guild/:guildId/bulk-delete/channels', async (req, res) => {
       }
     }
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🧹 Bulk Delete Channels Selesai',
       description: `Sebanyak **${deleted.length} channel** berhasil dihapus secara masal.`,
       color: 0x8b5cf6,
       fields: [
-        { name: 'Total Dihapus', value: `${deleted.length} channel`, inline: true },
-        ...(deleted.length > 0
-          ? [
-              {
-                name: 'Channel Terhapus',
-                value: deleted.map((n) => `• #${n}`).slice(0, 20).join('\n') +
-                  (deleted.length > 20 ? `\n...dan ${deleted.length - 20} lainnya` : '')
-              }
-            ]
-          : [])
+        { name: 'Total Dihapus', value: `${deleted.length} channel`, inline: true }
       ]
     });
 
@@ -1047,17 +980,14 @@ app.post('/api/guild/:guildId/bulk-delete/channels', async (req, res) => {
   }
 });
 
-// Bulk delete roles (Requirement 6)
+// Bulk delete roles
 app.post('/api/guild/:guildId/bulk-delete/roles', async (req, res) => {
   const { guildId } = req.params;
   const { roleIds } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !Array.isArray(roleIds) || roleIds.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan daftar roleIds wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan daftar roleIds wajib diisi.' });
   }
 
   try {
@@ -1073,15 +1003,15 @@ app.post('/api/guild/:guildId/bulk-delete/roles', async (req, res) => {
     const errors = [];
 
     for (const roleId of roleIds) {
-      if (roleId === guild.id) continue; // Skip @everyone
+      if (roleId === guild.id) continue;
       const role = guild.roles.cache.get(roleId);
       if (role) {
         if (role.managed) {
-          errors.push(`${role.name}: Role dikelola oleh bot/integrasi Discord (managed).`);
+          errors.push(`${role.name}: Role managed.`);
           continue;
         }
         if (role.position >= botHighest) {
-          errors.push(`${role.name}: Posisi role sama atau di atas role bot.`);
+          errors.push(`${role.name}: Posisi role setara/di atas bot.`);
           continue;
         }
 
@@ -1095,22 +1025,12 @@ app.post('/api/guild/:guildId/bulk-delete/roles', async (req, res) => {
       }
     }
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🧹 Bulk Delete Roles Selesai',
       description: `Sebanyak **${deleted.length} role** berhasil dihapus secara masal.`,
       color: 0x8b5cf6,
       fields: [
-        { name: 'Total Dihapus', value: `${deleted.length} role`, inline: true },
-        ...(deleted.length > 0
-          ? [
-              {
-                name: 'Role Terhapus',
-                value: deleted.map((n) => `• ${n}`).slice(0, 20).join('\n') +
-                  (deleted.length > 20 ? `\n...dan ${deleted.length - 20} lainnya` : '')
-              }
-            ]
-          : [])
+        { name: 'Total Dihapus', value: `${deleted.length} role`, inline: true }
       ]
     });
 
@@ -1130,17 +1050,14 @@ app.post('/api/guild/:guildId/bulk-delete/roles', async (req, res) => {
   }
 });
 
-// Bulk delete categories with cascade (Requirement 6)
+// Bulk delete categories with cascade
 app.post('/api/guild/:guildId/bulk-delete/categories', async (req, res) => {
   const { guildId } = req.params;
   const { categoryIds } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !Array.isArray(categoryIds) || categoryIds.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan daftar categoryIds wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan daftar categoryIds wajib diisi.' });
   }
 
   try {
@@ -1179,28 +1096,19 @@ app.post('/api/guild/:guildId/bulk-delete/categories', async (req, res) => {
       }
     }
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🧹 Bulk Delete Categories Selesai',
-      description: `Sebanyak **${deletedCategories.length} category** dan **${totalChannelsDeleted} channel** di dalamnya berhasil dihapus.`,
+      description: `Sebanyak **${deletedCategories.length} category** dan **${totalChannelsDeleted} channel** berhasil dihapus.`,
       color: 0x8b5cf6,
       fields: [
         { name: 'Category Dihapus', value: `${deletedCategories.length}`, inline: true },
-        { name: 'Channel Dihapus', value: `${totalChannelsDeleted}`, inline: true },
-        ...(deletedCategories.length > 0
-          ? [
-              {
-                name: 'Daftar Category Terhapus',
-                value: deletedCategories.map((n) => `• ${n}`).slice(0, 15).join('\n')
-              }
-            ]
-          : [])
+        { name: 'Channel Dihapus', value: `${totalChannelsDeleted}`, inline: true }
       ]
     });
 
     return res.json({
       success: true,
-      message: `Berhasil menghapus ${deletedCategories.length} category dan ${totalChannelsDeleted} channel di dalamnya.`,
+      message: `Berhasil menghapus ${deletedCategories.length} category dan ${totalChannelsDeleted} channel.`,
       categoryCount: deletedCategories.length,
       channelCount: totalChannelsDeleted,
       errors
@@ -1215,17 +1123,14 @@ app.post('/api/guild/:guildId/bulk-delete/categories', async (req, res) => {
   }
 });
 
-// Channel message purge / bulk delete messages (Requirement 6)
+// Channel message purge / bulk delete messages
 app.post('/api/guild/:guildId/channels/:channelId/purge', async (req, res) => {
   const { guildId, channelId } = req.params;
   const { amount = 10 } = req.body;
   const logChannelId = req.headers['x-log-channel-id'] || req.body.logChannelId;
 
   if (!guildId || !channelId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID dan Channel ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID dan Channel ID wajib diisi.' });
   }
 
   const cleanAmount = Math.max(1, Math.min(100, Number(amount) || 10));
@@ -1238,10 +1143,7 @@ app.post('/api/guild/:guildId/channels/:channelId/purge', async (req, res) => {
 
     const channel = guild.channels.cache.get(channelId);
     if (!channel || !channel.isTextBased()) {
-      return res.status(404).json({
-        success: false,
-        message: 'Channel tidak ditemukan atau bukan channel teks.'
-      });
+      return res.status(404).json({ success: false, message: 'Channel teks tidak ditemukan.' });
     }
 
     let deletedCount = 0;
@@ -1257,14 +1159,13 @@ app.post('/api/guild/:guildId/channels/:channelId/purge', async (req, res) => {
       deletedCount = deletedMessages.size;
     }
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, logChannelId, {
       title: '🧹 Bulk Delete Pesan (Purge)',
       description: `Sebanyak **${deletedCount} pesan** telah dibersihkan di channel **#${channel.name}**.`,
       color: 0x8b5cf6,
       fields: [
         { name: 'Channel', value: `#${channel.name}`, inline: true },
-        { name: 'Jumlah Pesan Dibersihkan', value: `${deletedCount} pesan`, inline: true }
+        { name: 'Jumlah Pesan', value: `${deletedCount} pesan`, inline: true }
       ]
     });
 
@@ -1277,7 +1178,7 @@ app.post('/api/guild/:guildId/channels/:channelId/purge', async (req, res) => {
     console.error('Error purging messages:', error);
     return res.status(500).json({
       success: false,
-      message: 'Gagal membersihkan pesan. Catatan: Discord tidak mengizinkan bulk delete pesan yang lebih tua dari 14 hari.',
+      message: 'Gagal membersihkan pesan (Discord membatasi pesan lebih tua dari 14 hari).',
       error: error.message
     });
   }
@@ -1289,27 +1190,19 @@ app.post('/api/setup', async (req, res) => {
   const activeLogChannel = req.headers['x-log-channel-id'] || logChannelId;
 
   if (!guildId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Guild ID wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Guild ID wajib diisi.' });
   }
 
   try {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
-
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        message: 'Bot Manager tidak ditemukan di Guild ID tersebut. Pastikan bot sudah diundang ke server.'
-      });
+      return res.status(404).json({ success: false, message: 'Bot Manager tidak ditemukan di server.' });
     }
 
-    // Jika builder dinonaktifkan, tidak membuat role/category/channel apapun
     if (!builderEnabled) {
       return res.json({
         success: true,
-        message: `Mode builder dinonaktifkan. Tidak ada role atau channel yang dibuat pada server ${guild.name}.`
+        message: `Mode builder dinonaktifkan.`
       });
     }
 
@@ -1362,14 +1255,13 @@ app.post('/api/setup', async (req, res) => {
       }
     }
 
-    // Send Discord Log (opsional)
     await sendDiscordLog(guild, activeLogChannel, {
       title: '🚀 Server Auto Setup Telah Dijalankan',
-      description: `Setup otomatis server berhasil dieksekusi melalui Discord Auto Setup Builder.`,
+      description: `Setup otomatis server berhasil dieksekusi.`,
       color: 0x22c55e,
       fields: [
         { name: 'Role Dibuat', value: `${createdRolesCount}`, inline: true },
-        { name: 'Channel Dibuat', value: `${createdChannelsCount}`, inline: true },
+        { name: 'Channel Dibuat', value: `${createdChannelsCount}`, inline: true }
       ]
     });
 
@@ -1390,7 +1282,7 @@ app.post('/api/setup', async (req, res) => {
 if (process.env.DISCORD_BOT_TOKEN) {
   client.login(process.env.DISCORD_BOT_TOKEN);
 } else {
-  console.warn('⚠️ DISCORD_BOT_TOKEN belum diatur. Bot Manager belum dapat terhubung ke Discord.');
+  console.warn('⚠️ DISCORD_BOT_TOKEN belum diatur.');
 }
 
 const PORT = process.env.PORT || 5000;
